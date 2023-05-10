@@ -1,15 +1,23 @@
 use actix_web::dev::Server;
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use std::net::TcpListener;
 
-async fn greet(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap_or("World");
-
-    return format!("Hello, {}!", &name);
+async fn greet() -> HttpResponse {
+    return HttpResponse::Ok().json("Hello World!");
 }
 
-async fn health_check() -> impl Responder {
-    return HttpResponse::Ok();
+async fn health_check() -> HttpResponse {
+    return HttpResponse::Ok().finish();
+}
+
+#[derive(serde::Deserialize)]
+struct Formdata {
+    email: String,
+    name: String,
+}
+
+async fn subscribe(form: web::Form<Formdata>) -> HttpResponse {
+    return HttpResponse::Ok().finish();
 }
 
 pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
@@ -17,6 +25,7 @@ pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
         App::new()
             .route("/", web::get().to(greet))
             .route("/health_check", web::get().to(health_check))
+            .route("subscriptions", web::post().to(subscribe))
     })
     .listen(listener)?
     .run();
