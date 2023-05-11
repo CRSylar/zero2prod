@@ -1,4 +1,4 @@
-use sqlx::{Executor, PgPool};
+use sqlx::{Error, Executor, PgPool};
 use std::net::TcpListener;
 use tokio::spawn;
 use uuid::Uuid;
@@ -6,6 +6,7 @@ use zero2prod::configuration::{get_config, DatabaseSettings};
 
 pub struct TestApp {
     pub address: String,
+    pub db_name: String,
     pub db_pool: PgPool,
 }
 
@@ -24,6 +25,7 @@ async fn spawn_app() -> TestApp {
 
     TestApp {
         address,
+        db_name: config.database.db_name,
         db_pool: connection_pool,
     }
 }
@@ -50,10 +52,28 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
+async fn cleanup_database(db_name: &str) -> Result<(), Error> {
+    let config = get_config().expect("Failed to load configuration file !");
+
+    let connection = PgPool::connect(&config.database.connection_string_no_db())
+        .await
+        .expect("Failed to connect to Postgres DB");
+
+    let q = format!(r#"DROP DATABASE IF EXISTS "{}""#, db_name);
+
+    sqlx::query(&q).execute(&connection).await?;
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn health_check_works() {
     // Arrange
-    let TestApp { address, .. } = spawn_app().await;
+    let TestApp {
+        address,
+        db_name,
+        db_pool,
+    } = spawn_app().await;
     let client = reqwest::Client::new();
 
     let res = client
@@ -64,11 +84,20 @@ async fn health_check_works() {
 
     assert!(res.status().is_success());
     assert_eq!(Some(0), res.content_length());
+
+    db_pool.close().await;
+    cleanup_database(&db_name)
+        .await
+        .expect(&format!("Cleaning failure on db {}", db_name));
 }
 
 #[tokio::test]
 async fn subscribe_ok() {
-    let TestApp { address, db_pool } = spawn_app().await;
+    let TestApp {
+        address,
+        db_pool,
+        db_name,
+    } = spawn_app().await;
 
     let client = reqwest::Client::new();
     let body = "name=cristiano%20romaldetti&email=cristianoromaldetti%40gmail.com";
@@ -90,11 +119,20 @@ async fn subscribe_ok() {
 
     assert_eq!(saved.email, "cristianoromaldetti@gmail.com");
     assert_eq!(saved.name, "cristiano romaldetti");
+
+    db_pool.close().await;
+    cleanup_database(&db_name)
+        .await
+        .expect(&format!("Cleaning failure on db {}", db_name));
 }
 
 #[tokio::test]
 async fn subscribe_fail() {
-    let TestApp { address, .. } = spawn_app().await;
+    let TestApp {
+        address,
+        db_name,
+        db_pool,
+    } = spawn_app().await;
     let client = reqwest::Client::new();
 
     let test_cases = [
@@ -122,4 +160,9 @@ async fn subscribe_fail() {
             message
         );
     }
+
+    db_pool.close().await;
+    cleanup_database(&db_name)
+        .await
+        .expect(&format!("Cleaning failure on db {}", db_name));
 }
