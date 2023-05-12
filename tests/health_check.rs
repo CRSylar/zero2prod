@@ -1,8 +1,21 @@
+use once_cell::sync::Lazy;
 use sqlx::{Error, Executor, PgPool};
 use std::net::TcpListener;
 use tokio::spawn;
 use uuid::Uuid;
 use zero2prod::configuration::{get_config, DatabaseSettings};
+use zero2prod::startup::run;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    if std::env::var("TEST_LOG").is_ok() {
+        let sub = get_subscriber("test".into(), "debug".into(), std::io::stdout);
+        init_subscriber(sub);
+    } else {
+        let sub = get_subscriber("test".into(), "debug".into(), std::io::sink);
+        init_subscriber(sub);
+    }
+});
 
 pub struct TestApp {
     pub address: String,
@@ -11,16 +24,17 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind at random port.");
     let port = listener.local_addr().unwrap().port();
-
     let address = format!("http://127.0.0.1:{}", port);
+
     let mut config = get_config().expect("Failed to load configuration file !");
     config.database.db_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&config.database).await;
 
-    let server =
-        zero2prod::startup::run(listener, connection_pool.clone()).expect("Failed to bind address");
+    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
     let _ = spawn(server);
 
     TestApp {

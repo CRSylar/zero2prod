@@ -5,7 +5,7 @@ set -eo pipefail
 
 if ! [ -x "$(command -v psql)" ]; then
 	echo >&2 "Error: psql is not installed."
-	exit -1
+	exit 1
 fi
 
 if ! [ -x "$(command -v sqlx)" ]; then
@@ -13,7 +13,7 @@ if ! [ -x "$(command -v sqlx)" ]; then
 	echo >&2 "Use: "
 	echo >&2 "	cargo install sqlx-cli --no-default-features --features native-tls,postgres"
 	echo >&2 "to install it"
-	exit -1
+	exit 1
 fi
 
 #Check if there's an user, or Default to 'postgres'
@@ -28,7 +28,7 @@ DB_PORT="${POSTGRES_PORT:=5432}"
 #Check for the uri host, default to 'localhost'
 DB_HOST="${POSTGRES_HOST:=localhost}"
 
-# Launch doker container with Postgres if is not already done
+# Launch docker container with Postgres if is not already done
 if [[ -z "${SKIP_DOCKER}" ]]
 then
 	docker run \
