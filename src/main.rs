@@ -1,3 +1,4 @@
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use std::net::TcpListener;
 use zero2prod::configuration::get_config;
@@ -13,7 +14,7 @@ async fn main() -> Result<(), std::io::Error> {
     let config = get_config().expect("Failed to load configuration file !");
     let address = format!("127.0.0.1:{}", config.application_port);
 
-    let connection_pool = PgPool::connect(&config.database.connection_string())
+    let connection_pool = PgPool::connect(&config.database.connection_string().expose_secret())
         .await
         .expect("Failed to Connect to Postgres DB");
     let listener = TcpListener::bind(address).expect(&format!(

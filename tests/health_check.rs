@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use sqlx::{Error, Executor, PgPool};
 use std::net::TcpListener;
 use tokio::spawn;
@@ -45,7 +46,7 @@ async fn spawn_app() -> TestApp {
 }
 
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let connection = PgPool::connect(&config.connection_string_no_db())
+    let connection = PgPool::connect(&config.connection_string_no_db().expose_secret())
         .await
         .expect("Failed to connect to Postgres DB");
 
@@ -54,7 +55,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to create new Database");
 
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Database");
 
@@ -69,7 +70,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 async fn cleanup_database(db_name: &str) -> Result<(), Error> {
     let config = get_config().expect("Failed to load configuration file !");
 
-    let connection = PgPool::connect(&config.database.connection_string_no_db())
+    let connection = PgPool::connect(&config.database.connection_string_no_db().expose_secret())
         .await
         .expect("Failed to connect to Postgres DB");
 
