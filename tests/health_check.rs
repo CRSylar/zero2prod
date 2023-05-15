@@ -216,7 +216,7 @@ async fn subscribe_return_200_if_fields_are_not_empty() {
             .expect("Failed to execute the request");
 
         assert_eq!(
-            200,
+            400,
             res.status().as_u16(),
             "The Api did not return a 200 OK when the payload was {}",
             description
