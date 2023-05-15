@@ -181,3 +181,50 @@ async fn subscribe_fail() {
         .await
         .expect(&format!("Cleaning failure on db {}", db_name));
 }
+
+#[tokio::test]
+async fn subscribe_return_200_if_fields_are_not_empty() {
+    let TestApp {
+        address,
+        db_name,
+        db_pool,
+    } = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        (
+            "name=&email=cristianoromaldetti@gmail.com",
+            "Empty name field",
+        ),
+        (
+            "name=cristiano%20romaldetti&email=",
+            "Missing the Email field",
+        ),
+        (
+            "name=cristiano%20romaldetti&email=something-not-an-email",
+            "Email field not containing and email format",
+        ),
+    ];
+
+    for (body, description) in test_cases {
+        let res = client
+            .post(&format!("{}/subscriptions", &address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute the request");
+
+        assert_eq!(
+            200,
+            res.status().as_u16(),
+            "The Api did not return a 200 OK when the payload was {}",
+            description
+        );
+    }
+
+    db_pool.close().await;
+    cleanup_database(&db_name)
+        .await
+        .expect(&format!("Cleaning failure on db {}", db_name));
+}
